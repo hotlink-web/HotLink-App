@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ 'Join HotLink' if mode == 'register' else 'Log In' }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">♥ Hot<span>Link</span>
+    <div class="tagline">Real People. Real Connections.</div>
+  </a>
+  <nav class="topnav">
+    <a href="/">Home</a>
+    <a href="{{ url_for('login') }}">Log In</a>
+    <a href="{{ url_for('register') }}">Join Now</a>
+  </nav>
+</header>
+
+<main class="form-wrap">
+  {% with notices = get_flashed_messages(with_categories=true) %}
+    {% for category, message in notices %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if mode == 'register' %}
+    <h1>Join <span class="pink">HotLink</span></h1>
+    <p class="muted">Create your account and meet real people.</p>
+    <form method="post">
+      <label>Username</label>
+      <input name="username" minlength="3" maxlength="30" required
+             autocomplete="username" placeholder="Choose a username">
+
+      <label>Email address</label>
+      <input type="email" name="email" required autocomplete="email"
+             placeholder="you@example.com">
+
+      <label>Password (at least 10 characters)</label>
+      <input type="password" name="password" minlength="10" required
+             autocomplete="new-password">
+
+      <label>Age</label>
+      <input type="number" name="age" min="18" max="120" required>
+
+      <label>
+        <input type="checkbox" name="adult_consent" value="yes"
+               required style="width:auto">
+        I confirm that I am 18 or older and agree to the site's rules.
+      </label>
+      <br><br>
+      <button class="btn" type="submit">Create Account →</button>
+    </form>
+    <p>Already registered? <a class="pink" href="{{ url_for('login') }}">Log in</a></p>
+  {% else %}
+    <h1>Welcome <span class="pink">Back</span></h1>
+    <p class="muted">Log in to your HotLink account.</p>
+    <form method="post">
+      <label>Username or email</label>
+      <input name="identity" required autocomplete="username">
+
+      <label>Password</label>
+      <input type="password" name="password" required
+             autocomplete="current-password">
+
+      <button class="btn" type="submit">Log In →</button>
+    </form>
+    <p>New to HotLink? <a class="pink" href="{{ url_for('register') }}">Join now</a></p>
+  {% endif %}
+</main>
+
+<footer>HotLink · Adults 18+ · Keep your account secure</footer>
+</body>
+</html>

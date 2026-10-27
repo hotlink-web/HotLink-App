@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HotLink — Real People. Real Connections.</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <a href="/" class="brand">♥ Hot<span>Link</span>
+    <div class="tagline">Real People. Real Connections.</div>
+  </a>
+  <nav class="topnav">
+    <a class="active" href="/">Home</a>
+    <a href="{{ url_for('login') }}">Search</a>
+    <a href="{{ url_for('login') }}">Matches</a>
+    <a href="{{ url_for('login') }}">Messages</a>
+    <a href="{{ url_for('login') }}">Profile</a>
+  </nav>
+  <a class="btn" href="{{ url_for('register') }}">Join Now →</a>
+</header>
+
+<main class="main">
+  {% with notices = get_flashed_messages(with_categories=true) %}
+    {% for category, message in notices %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <section class="hero">
+    <p>WELCOME TO HOTLINK</p>
+    <h1>Not Just a Dating Site...</h1>
+    <div class="hero-script">It's a Hook-Up<br>Lifestyle.</div>
+    <p>Meet real adults. Discover people nearby. Build mutual connections
+       and chat when the interest goes both ways.</p>
+    <a class="btn" href="{{ url_for('register') }}">Join Now →</a>
+    <a class="btn btn-outline" href="{{ url_for('login') }}">Log In</a>
+    <p class="muted">18+ only · Respect · Consent · Privacy</p>
+  </section>
+
+  <div class="section-head">
+    <h2>Find Your Connection</h2>
+  </div>
+
+  <section class="panel">
+    <p>HotLink is a community for adults who want to meet other adults.
+       Create a profile to appear in discovery, like people you are interested
+       in, and message only after a mutual match.</p>
+    <a class="btn" href="{{ url_for('register') }}">Create Your Account</a>
+  </section>
+</main>
+
+<footer>♥ HotLink · Real People. Real Connections. · 18+</footer>
+</body>
+</html>

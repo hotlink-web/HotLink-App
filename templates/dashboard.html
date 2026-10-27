@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ page }} — HotLink</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <a href="{{ url_for('browse') }}" class="brand">♥ Hot<span>Link</span>
+    <div class="tagline">Real People. Real Connections.</div>
+  </a>
+  <nav class="topnav">
+    <a href="{{ url_for('browse') }}">⌂ Home</a>
+    <a href="{{ url_for('browse') }}">⌕ Search</a>
+    <a href="{{ url_for('matches') }}">♥ Matches</a>
+    <a href="{{ url_for('messages') }}">☏ Messages</a>
+    <a href="{{ url_for('profile') }}">♙ Profile</a>
+  </nav>
+  <a class="btn btn-small" href="{{ url_for('vip') }}">♛ VIP</a>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <a class="side-link {{ 'active' if page == 'Browse' else '' }}"
+       href="{{ url_for('browse') }}">⌂ Home</a>
+    <a class="side-link {{ 'active' if page == 'Browse' else '' }}"
+       href="{{ url_for('browse') }}">⌕ Browse</a>
+    <a class="side-link {{ 'active' if page == 'Nearby' else '' }}"
+       href="{{ url_for('nearby') }}">♧ Nearby</a>
+    <a class="side-link {{ 'active' if page == 'Likes' else '' }}"
+       href="{{ url_for('likes') }}">♡ Likes</a>
+    <a class="side-link {{ 'active' if page == 'Matches' else '' }}"
+       href="{{ url_for('matches') }}">♥ Matches</a>
+    <a class="side-link {{ 'active' if page == 'Messages' else '' }}"
+       href="{{ url_for('messages') }}">☏ Messages</a>
+    <a class="side-link {{ 'active' if page == 'Profile' else '' }}"
+       href="{{ url_for('profile') }}">♙ Profile</a>
+    <a class="side-link {{ 'active' if page == 'Settings' else '' }}"
+       href="{{ url_for('settings') }}">⚙ Settings</a>
+    <div class="panel">
+      <strong class="pink">♥ Tonight's Hot Picks</strong>
+      <p class="muted">Discover real people who have joined HotLink.</p>
+    </div>
+    <form method="post" action="{{ url_for('logout') }}">
+      <button class="btn btn-outline" type="submit">Log Out</button>
+    </form>
+  </aside>
+
+  <main class="main">
+    {% with notices = get_flashed_messages(with_categories=true) %}
+      {% for category, message in notices %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if page == 'Profile' %}
+      <section class="panel">
+        <h1>Your Profile</h1>
+        <p class="muted">Your account information is saved in the database.</p>
+        <form method="post" enctype="multipart/form-data">
+          <label>Username</label>
+          <input value="{{ me.username }}" disabled>
+          <label>Email</label>
+          <input value="{{ me.email }}" disabled>
+          <label>Age</label>
+          <input value="{{ me.age }}" disabled>
+          <label>City or town</label>
+          <input name="city" maxlength="100" value="{{ me.city }}"
+                 placeholder="Enter your city or town">
+          <label>About me</label>
+          <textarea name="bio" maxlength="500"
+                    placeholder="Tell people about yourself">{{ me.bio }}</textarea>
+          <label>Choose a profile photo</label>
+          {% if me.photo %}
+            <div style="max-width:220px;margin:10px 0 16px">
+              <img src="{{ me.photo }}" alt="Your current profile photo"
+                   style="width:100%;border-radius:12px;border:1px solid #24303e">
+            </div>
+          {% endif %}
+          <input name="photo" type="file"
+                 accept="image/jpeg,image/png,image/webp"
+                 aria-label="Upload profile photo">
+          <p class="muted">JPG, PNG or WEBP. Maximum upload size: 2 MB.</p>
+          <button class="btn" type="submit">Save Profile</button>
+        </form>
+      </section>
+
+    {% elif page == 'Settings' %}
+      <section class="panel">
+        <h1>Privacy Settings</h1>
+        <p>Choose whether your profile appears in discovery.</p>
+        <form method="post">
+          <label>
+            <input style="width:auto" type="checkbox" name="visible"
+                   {% if me.visible %}checked{% endif %}>
+            Show my profile in discovery
+          </label>
+          <br><br>
+          <button class="btn" type="submit">Save Settings</button>
+        </form>
+      </section>
+
+    {% elif page == 'VIP' %}
+      <section class="panel">
+        <h1>♛ HotLink <span class="pink">VIP</span></h1>
+        <p>Premium features will be activated after a verified payment provider
+           is integrated and configured.</p>
+        <p class="muted">No payments are being collected by this development version.</p>
+      </section>
+
+    {% elif page == 'Chat' %}
+      <section class="panel">
+        <h1>Chat with {{ other.username }}</h1>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0">
+          <form method="post"
+                action="{{ url_for('block_user', user_id=other.id) }}"
+                onsubmit="return confirm('Block this user and remove the match?')">
+            <button class="btn btn-outline" type="submit">Block User</button>
+          </form>
+        </div>
+
+        <form method="post"
+              action="{{ url_for('report_user', user_id=other.id) }}">
+          <label>Report this user</label>
+          <textarea name="reason" minlength="5" maxlength="500"
+                    required placeholder="Explain your concern"></textarea>
+          <button class="btn btn-outline" type="submit">Submit Report</button>
+        </form>
+
+
+        {% for m in history %}
+          <div class="message {{ 'mine' if m.sender_id == me.id else '' }}">
+            {{ m.body }}
+            <div class="muted">{{ m.created_at }}</div>
+          </div>
+        {% else %}
+          <div class="empty">No messages yet. Say hello!</div>
+        {% endfor %}
+        <form method="post">
+          <label>Your message</label>
+          <textarea name="body" maxlength="2000" required
+                    placeholder="Write a message..."></textarea>
+          <button class="btn" type="submit">Send Message →</button>
+        </form>
+      </section>
+
+    {% elif page == 'Messages' %}
+      <div class="section-head"><h1>Your Messages</h1></div>
+      {% for c in conversations %}
+        <section class="panel">
+          <h3>{{ c.username }}</h3>
+          <p class="muted">{{ c.last_message or '' }}</p>
+          <a class="btn btn-small" href="{{ url_for('chat', user_id=c.id) }}">
+            Open Conversation
+          </a>
+        </section>
+      {% else %}
+        <div class="empty">No conversations yet. Match with someone to start chatting.</div>
+      {% endfor %}
+
+    {% else %}
+      <section class="hero">
+        <h1>
+          {% if page == 'Matches' %}Your Matches
+          {% elif page == 'Likes' %}People Who Liked You
+          {% elif page == 'Nearby' %}People Near You
+          {% else %}Not Just a Dating Site...{% endif %}
+        </h1>
+        <div class="hero-script">
+          {% if page == 'Browse' %}It's a Hook-Up Lifestyle.{% endif %}
+        </div>
+        {% if page == 'Browse' %}
+          <p>Discover genuine adult profiles and make mutual connections.</p>
+        {% endif %}
+        <form method="get" action="{{ url_for('browse') }}">
+          <input name="q" placeholder="Search usernames or cities">
+          <button class="btn" type="submit">Search</button>
+        </form>
+      </section>
+
+      <div class="section-head">
+        <h2>
+          {% if page == 'Matches' %}Your Mutual Matches
+          {% elif page == 'Likes' %}Incoming Likes
+          {% elif page == 'Nearby' %}People in Your City
+          {% else %}Discover People{% endif %}
+        </h2>
+      </div>
+
+      <section class="cards">
+        {% for u in users %}
+          <article class="card">
+            <div class="avatar">
+              {% if u.photo %}
+                <img src="{{ u.photo }}" alt="Profile photo"
+                     loading="lazy" referrerpolicy="no-referrer">
+              {% else %}
+                {{ u.username[0]|upper }}
+              {% endif %}
+            </div>
+            <div class="card-body">
+              <h3>{{ u.username }}</h3>
+              <div class="muted">{{ u.age }} years old</div>
+              <div class="muted">{{ u.city or 'Location not provided' }}</div>
+              <p>{{ u.bio or 'This member has not added a bio yet.' }}</p>
+              <div class="actions">
+                {% if page == 'Likes' and u.mutual %}
+                  <a class="btn btn-small"
+                     href="{{ url_for('chat', user_id=u.id) }}">Message</a>
+                {% elif page == 'Likes' %}
+                  <form method="post" action="{{ url_for('like', user_id=u.id) }}">
+                    <button class="btn btn-small" type="submit">Like Back</button>
+                  </form>
+                {% elif page == 'Matches' %}
+                  <a class="btn btn-small"
+                     href="{{ url_for('chat', user_id=u.id) }}">Message</a>
+                {% elif u.already_liked %}
+                  <form method="post" action="{{ url_for('unlike', user_id=u.id) }}">
+                    <button class="btn btn-small btn-outline" type="submit">
+                      ♥ Liked
+                    </button>
+                  </form>
+                {% else %}
+                  <form method="post" action="{{ url_for('like', user_id=u.id) }}">
+                    <button class="btn btn-small" type="submit">♡ Like</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          </article>
+        {% else %}
+          <div class="empty">
+            No profiles to show yet.<br>
+            Invite people to create real accounts and join your community.
+          </div>
+        {% endfor %}
+      </section>
+    {% endif %}
+  </main>
+</div>
+
+<footer>
+  ♥ HotLink · Real People. Real Connections. · Adults 18+ ·
+  <a href="{{ url_for('settings') }}">Privacy</a>
+</footer>
+</body>
+</html>
