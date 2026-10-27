@@ -46,6 +46,61 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS follows (
+                follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                followed_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (follower_id, followed_id),
+                CHECK (follower_id != followed_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS friend_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'accepted', 'declined')),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(sender_id, receiver_id),
+                CHECK (sender_id != receiver_id)
+            );
+
+
+            CREATE TABLE IF NOT EXISTS stories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                caption TEXT NOT NULL DEFAULT '',
+                media_path TEXT NOT NULL,
+                media_type TEXT NOT NULL CHECK(media_type IN ('image', 'video')),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                body TEXT NOT NULL DEFAULT '',
+                media_path TEXT NOT NULL DEFAULT '',
+                media_type TEXT NOT NULL DEFAULT 'none'
+                    CHECK (media_type IN ('none', 'image', 'video')),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS post_likes (
+                post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (post_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS post_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                body TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS likes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 liker_id INTEGER NOT NULL REFERENCES users(id)
@@ -132,7 +187,7 @@ def home():
     if not session.get("user_id"):
         return render_template("landing.html")
 
-    return redirect(url_for("browse"))
+    return redirect(url_for("feed"))
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -488,6 +543,264 @@ def chat(user_id):
 
 
 
+@app.route("/user/<int:user_id>")
+@login_required
+def public_profile(user_id):
+    me = current_user()
+
+    if user_id == me["id"]:
+        return redirect(url_for("profile"))
+
+    with get_db() as db:
+        other = db.execute("""
+            SELECT * FROM users
+            WHERE id = ? AND visible = 1
+        """, (user_id,)).fetchone()
+
+        if not other:
+            abort(404)
+
+        blocked = db.execute("""
+            SELECT 1 FROM blocks
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+            LIMIT 1
+        """, (me["id"], user_id, user_id, me["id"])).fetchone()
+
+        if blocked:
+            abort(404)
+
+        already_liked = db.execute("""
+            SELECT 1 FROM likes
+            WHERE liker_id = ? AND liked_id = ?
+        """, (me["id"], user_id)).fetchone()
+
+        mutual = db.execute("""
+            SELECT 1 FROM likes
+            WHERE liker_id = ? AND liked_id = ?
+        """, (user_id, me["id"])).fetchone()
+
+        following = db.execute("""
+            SELECT 1 FROM follows
+            WHERE follower_id = ? AND followed_id = ?
+        """, (me["id"], user_id)).fetchone()
+
+        friend_request = db.execute("""
+            SELECT * FROM friend_requests
+            WHERE (sender_id = ? AND receiver_id = ?)
+               OR (sender_id = ? AND receiver_id = ?)
+        """, (me["id"], user_id, user_id, me["id"])).fetchone()
+
+    return render_template(
+        "dashboard.html",
+        page="PublicProfile",
+        other=other,
+        already_liked=bool(already_liked),
+        mutual=bool(mutual),
+        following=bool(following),
+        friend_request=friend_request,
+    )
+
+
+@app.route("/follow/<int:user_id>", methods=["POST"])
+@login_required
+def follow_user(user_id):
+    me = current_user()
+
+    if user_id == me["id"]:
+        abort(400)
+
+    with get_db() as db:
+        target = db.execute(
+            "SELECT id FROM users WHERE id = ? AND visible = 1",
+            (user_id,)
+        ).fetchone()
+
+        if not target:
+            abort(404)
+
+        blocked = db.execute("""
+            SELECT 1 FROM blocks
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+            LIMIT 1
+        """, (me["id"], user_id, user_id, me["id"])).fetchone()
+
+        if blocked:
+            flash("You cannot follow this account.", "error")
+        else:
+            existing = db.execute("""
+                SELECT 1 FROM follows
+                WHERE follower_id = ? AND followed_id = ?
+            """, (me["id"], user_id)).fetchone()
+
+            if existing:
+                db.execute("""
+                    DELETE FROM follows
+                    WHERE follower_id = ? AND followed_id = ?
+                """, (me["id"], user_id))
+                flash("You unfollowed this member.", "success")
+            else:
+                db.execute("""
+                    INSERT INTO follows (follower_id, followed_id)
+                    VALUES (?, ?)
+                """, (me["id"], user_id))
+                flash("You are now following this member.", "success")
+
+    return redirect(url_for("public_profile", user_id=user_id))
+
+
+@app.route("/friend-request/<int:user_id>", methods=["POST"])
+@login_required
+def send_friend_request(user_id):
+    me = current_user()
+
+    if user_id == me["id"]:
+        abort(400)
+
+    with get_db() as db:
+        target = db.execute(
+            "SELECT id FROM users WHERE id = ? AND visible = 1",
+            (user_id,)
+        ).fetchone()
+
+        if not target:
+            abort(404)
+
+        blocked = db.execute("""
+            SELECT 1 FROM blocks
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+            LIMIT 1
+        """, (me["id"], user_id, user_id, me["id"])).fetchone()
+
+        if blocked:
+            flash("You cannot send a friend request to this account.", "error")
+        else:
+            existing = db.execute("""
+                SELECT * FROM friend_requests
+                WHERE (sender_id = ? AND receiver_id = ?)
+                   OR (sender_id = ? AND receiver_id = ?)
+            """, (me["id"], user_id, user_id, me["id"])).fetchone()
+
+            if existing and existing["status"] == "accepted":
+                flash("You are already friends.", "success")
+            elif existing and existing["status"] == "pending":
+                flash("A friend request is already pending.", "error")
+            elif existing:
+                db.execute("""
+                    DELETE FROM friend_requests WHERE id = ?
+                """, (existing["id"],))
+                db.execute("""
+                    INSERT INTO friend_requests (sender_id, receiver_id)
+                    VALUES (?, ?)
+                """, (me["id"], user_id))
+                flash("Friend request sent.", "success")
+            else:
+                db.execute("""
+                    INSERT INTO friend_requests (sender_id, receiver_id)
+                    VALUES (?, ?)
+                """, (me["id"], user_id))
+                flash("Friend request sent.", "success")
+
+    return redirect(url_for("public_profile", user_id=user_id))
+
+
+@app.route("/friend-request/respond/<int:request_id>", methods=["POST"])
+@login_required
+def respond_friend_request(request_id):
+    me = current_user()
+    action = request.form.get("action", "")
+
+    if action not in ("accept", "decline"):
+        abort(400)
+
+    with get_db() as db:
+        req = db.execute("""
+            SELECT * FROM friend_requests
+            WHERE id = ? AND receiver_id = ? AND status = 'pending'
+        """, (request_id, me["id"])).fetchone()
+
+        if not req:
+            abort(404)
+
+        blocked = db.execute("""
+            SELECT 1 FROM blocks
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+            LIMIT 1
+        """, (me["id"], req["sender_id"], req["sender_id"], me["id"])).fetchone()
+
+        if blocked:
+            abort(403)
+
+        status = "accepted" if action == "accept" else "declined"
+        db.execute("""
+            UPDATE friend_requests SET status = ? WHERE id = ?
+        """, (status, request_id))
+
+        flash(
+            "Friend request accepted." if action == "accept"
+            else "Friend request declined.",
+            "success"
+        )
+
+    return redirect(url_for("public_profile", user_id=req["sender_id"]))
+
+
+
+
+@app.route("/profile/cover", methods=["POST"])
+@login_required
+def upload_cover_photo():
+    me = current_user()
+    uploaded = request.files.get("cover_photo")
+
+    if not uploaded or not uploaded.filename:
+        flash("Choose a cover photo first.", "error")
+        return redirect(url_for("profile"))
+
+    try:
+        image = Image.open(uploaded.stream)
+        image.verify()
+        uploaded.stream.seek(0)
+        image = Image.open(uploaded.stream)
+
+        if image.format not in ("JPEG", "PNG", "WEBP"):
+            flash("Use a JPG, PNG or WEBP cover photo.", "error")
+            return redirect(url_for("profile"))
+
+        if image.width * image.height > 16000000:
+            flash("Cover image is too large.", "error")
+            return redirect(url_for("profile"))
+
+        image.thumbnail((1800, 1200))
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+
+        filename = uuid.uuid4().hex + "_cover.jpg"
+        upload_dir = os.path.join(app.root_path, "static", "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        image.save(
+            os.path.join(upload_dir, filename),
+            format="JPEG", quality=85, optimize=True
+        )
+        cover = "/static/uploads/" + filename
+
+        with get_db() as db:
+            db.execute(
+                "UPDATE users SET cover_photo=? WHERE id=?",
+                (cover, me["id"])
+            )
+            db.commit()
+
+        flash("Cover photo updated!", "success")
+    except (UnidentifiedImageError, OSError, ValueError,
+            Image.DecompressionBombError):
+        flash("That image could not be processed.", "error")
+
+    return redirect(url_for("profile"))
+
 @app.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
@@ -671,6 +984,277 @@ def report_user(user_id):
     return redirect(url_for("messages"))
 
 
+
+
+
+
+
+@app.route("/stories/create", methods=["GET", "POST"])
+@login_required
+def create_story():
+    if request.method == "GET":
+        return render_template("create_story.html")
+
+    import os
+    from datetime import timedelta
+    from werkzeug.utils import secure_filename
+
+    media = request.files.get("media")
+    caption = request.form.get("caption", "").strip()
+
+    if not media or not media.filename:
+        flash("Choose a photo or video for your story.", "error")
+        return redirect(url_for("create_story"))
+
+    filename = secure_filename(media.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    image_exts = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+    video_exts = {".mp4", ".webm", ".mov"}
+
+    if ext in image_exts:
+        media_type = "image"
+        try:
+            from PIL import Image
+            media.stream.seek(0)
+            with Image.open(media.stream) as img:
+                img.verify()
+            media.stream.seek(0)
+        except Exception:
+            flash("That image file is invalid.", "error")
+            return redirect(url_for("create_story"))
+    elif ext in video_exts:
+        media_type = "video"
+    else:
+        flash("Choose a JPG, PNG, GIF, WEBP, MP4, WEBM, or MOV file.", "error")
+        return redirect(url_for("create_story"))
+
+    os.makedirs("static/uploads/stories", exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+    media.save(os.path.join("static/uploads/stories", stored_name))
+    media_path = f"uploads/stories/{stored_name}"
+
+    now = datetime.now(timezone.utc)
+    created_at = now.isoformat(timespec="seconds")
+    expires_at = (now + timedelta(hours=24)).isoformat(timespec="seconds")
+
+    with get_db() as db:
+        db.execute(
+            """INSERT INTO stories
+               (user_id, caption, media_path, media_type, created_at, expires_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (session["user_id"], caption, media_path, media_type,
+             created_at, expires_at)
+        )
+
+    flash("Your story was published!", "success")
+    return redirect(url_for("feed"))
+
+
+
+
+@app.route("/admin/verification", methods=["GET", "POST"])
+@login_required
+def manage_verification():
+    me = current_user()
+    if not me or me["username"].lower() != "hotlink":
+        abort(403)
+
+    with get_db() as db:
+        if request.method == "POST":
+            user_id = request.form.get("user_id", type=int)
+            action = request.form.get("action", "")
+            if user_id and action in ("verify", "unverify"):
+                db.execute(
+                    "UPDATE users SET is_verified=? WHERE id=?",
+                    (1 if action == "verify" else 0, user_id)
+                )
+                db.commit()
+                flash("Verification status updated.", "success")
+                return redirect(url_for("manage_verification"))
+
+        members = db.execute(
+            "SELECT id, username, is_verified FROM users ORDER BY username"
+        ).fetchall()
+
+    return render_template(
+        "verification_admin.html", members=members
+    )
+
+@app.route("/feed")
+@login_required
+def feed():
+    with get_db() as db:
+        posts = db.execute(
+            """
+            SELECT posts.*,
+                   users.username,
+                   users.is_verified,
+                   (SELECT COUNT(*) FROM post_likes
+                    WHERE post_likes.post_id = posts.id) AS like_count,
+                   (SELECT COUNT(*) FROM post_comments
+                    WHERE post_comments.post_id = posts.id) AS comment_count,
+                   EXISTS(
+                       SELECT 1 FROM post_likes
+                       WHERE post_likes.post_id = posts.id
+                         AND post_likes.user_id = ?
+                   ) AS liked_by_me
+            FROM posts
+            JOIN users ON users.id = posts.user_id
+            ORDER BY posts.created_at DESC, posts.id DESC
+            LIMIT 100
+            """,
+            (session["user_id"],)
+        ).fetchall()
+
+        post_comments = {}
+        for post in posts:
+            post_comments[post["id"]] = db.execute(
+                """
+                SELECT post_comments.*, users.username, users.is_verified
+                FROM post_comments
+                JOIN users ON users.id = post_comments.user_id
+                WHERE post_comments.post_id = ?
+                ORDER BY post_comments.created_at ASC, post_comments.id ASC
+                """,
+                (post["id"],)
+            ).fetchall()
+
+    return render_template(
+        "dashboard.html",
+        page="Feed",
+        posts=posts,
+        post_comments=post_comments
+    )
+
+
+
+@app.route("/posts/<int:post_id>/like", methods=["POST"])
+@login_required
+def like_post(post_id):
+    user_id = session["user_id"]
+
+    with get_db() as db:
+        post = db.execute(
+            "SELECT id FROM posts WHERE id = ?", (post_id,)
+        ).fetchone()
+
+        if post is None:
+            flash("Post not found.", "error")
+            return redirect(request.referrer or url_for("feed"))
+
+        existing = db.execute(
+            "SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?",
+            (post_id, user_id)
+        ).fetchone()
+
+        if existing:
+            db.execute(
+                "DELETE FROM post_likes WHERE post_id = ? AND user_id = ?",
+                (post_id, user_id)
+            )
+        else:
+            db.execute(
+                "INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)",
+                (post_id, user_id)
+            )
+
+    return redirect(request.referrer or url_for("feed"))
+
+@app.route("/posts/create", methods=["GET"])
+@login_required
+def create_post_page():
+    return render_template("create_post.html")
+
+
+@app.route("/posts/create", methods=["POST"])
+@login_required
+def create_post():
+    import os
+    from werkzeug.utils import secure_filename
+
+    body = request.form.get("body", "").strip()
+    media = request.files.get("media")
+    media_path = ""
+    media_type = "none"
+
+    if not body and (not media or not media.filename):
+        flash("Write something or choose a photo/video.", "error")
+        return redirect(request.referrer or url_for("browse"))
+
+    if media and media.filename:
+        filename = secure_filename(media.filename)
+        ext = os.path.splitext(filename)[1].lower()
+
+        image_exts = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+        video_exts = {".mp4", ".webm", ".mov"}
+
+        if ext in image_exts:
+            media_type = "image"
+        elif ext in video_exts:
+            media_type = "video"
+        else:
+            flash("Choose a JPG, PNG, GIF, WEBP, MP4, WEBM, or MOV file.", "error")
+            return redirect(request.referrer or url_for("browse"))
+
+        if media_type == "image":
+            try:
+                from PIL import Image
+                media.stream.seek(0)
+                with Image.open(media.stream) as img:
+                    img.verify()
+                media.stream.seek(0)
+            except Exception:
+                flash("That image file is invalid.", "error")
+                return redirect(request.referrer or url_for("browse"))
+
+        os.makedirs("static/uploads/posts", exist_ok=True)
+        stored_name = f"{uuid.uuid4().hex}{ext}"
+        media.save(os.path.join("static/uploads/posts", stored_name))
+        media_path = f"uploads/posts/{stored_name}"
+
+    with get_db() as db:
+        db.execute(
+            """INSERT INTO posts (user_id, body, media_path, media_type)
+               VALUES (?, ?, ?, ?)""",
+            (session["user_id"], body, media_path, media_type)
+        )
+
+    flash("Your post was published!", "success")
+    return redirect(url_for("feed"))
+
+
+@app.route("/posts/<int:post_id>/comment", methods=["POST"])
+@login_required
+def add_post_comment(post_id):
+    body = request.form.get("body", "").strip()
+
+    if not body:
+        flash("Write a comment first.", "error")
+        return redirect(request.referrer or url_for("feed"))
+
+    if len(body) > 2000:
+        flash("Comments must be 2,000 characters or fewer.", "error")
+        return redirect(request.referrer or url_for("feed"))
+
+    with get_db() as db:
+        post = db.execute(
+            "SELECT id FROM posts WHERE id = ?", (post_id,)
+        ).fetchone()
+
+        if post is None:
+            flash("Post not found.", "error")
+            return redirect(url_for("feed"))
+
+        db.execute(
+            """INSERT INTO post_comments (post_id, user_id, body)
+               VALUES (?, ?, ?)""",
+            (post_id, session["user_id"], body)
+        )
+
+    flash("Comment added.", "success")
+    return redirect(request.referrer or url_for("feed"))
+
+
 @app.route("/health")
 def health():
     return {"status": "ok", "database": os.path.exists(DB_PATH)}
@@ -680,9 +1264,26 @@ with app.app_context():
     init_db()
 
 
+@app.route("/live")
+def hotlink_live_page():
+    return render_template("live.html")
+
+
+
+# LIVE_BACKEND_INTEGRATED
+from live_backend import live_bp, socketio, init_live_db
+
+app.register_blueprint(live_bp)
+socketio.init_app(app)
+init_live_db()
+
 if __name__ == "__main__":
-    app.run(
+    socketio.run(
+        app,
         host="127.0.0.1",
         port=5000,
-        debug=False
+        debug=False,
+        allow_unsafe_werkzeug=True
     )
+
+

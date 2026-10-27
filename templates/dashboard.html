@@ -8,38 +8,29 @@
 </head>
 <body>
 
-<header class="topbar">
-  <a href="{{ url_for('browse') }}" class="brand">♥ Hot<span>Link</span>
-    <div class="tagline">Real People. Real Connections.</div>
-  </a>
-  <nav class="topnav">
-    <a href="{{ url_for('browse') }}">⌂ Home</a>
-    <a href="{{ url_for('browse') }}">⌕ Search</a>
-    <a href="{{ url_for('matches') }}">♥ Matches</a>
-    <a href="{{ url_for('messages') }}">☏ Messages</a>
-    <a href="{{ url_for('profile') }}">♙ Profile</a>
-  </nav>
+<header class="topbar hotlink-member-header">
+  <span class="member-page-title">{{ page }}</span>
   <a class="btn btn-small" href="{{ url_for('vip') }}">♛ VIP</a>
 </header>
 
 <div class="layout">
   <aside class="sidebar">
+    <a class="side-link {{ 'active' if page == 'Feed' else '' }}"
+       href="{{ url_for('home') }}"><span class="nav-icon">⌂</span><span>Home</span></a>
     <a class="side-link {{ 'active' if page == 'Browse' else '' }}"
-       href="{{ url_for('browse') }}">⌂ Home</a>
-    <a class="side-link {{ 'active' if page == 'Browse' else '' }}"
-       href="{{ url_for('browse') }}">⌕ Browse</a>
+       href="{{ url_for('browse') }}"><span class="nav-icon">⌕</span><span>Browse</span></a>
     <a class="side-link {{ 'active' if page == 'Nearby' else '' }}"
-       href="{{ url_for('nearby') }}">♧ Nearby</a>
+       href="{{ url_for('nearby') }}"><span class="nav-icon">📍</span><span>Nearby</span></a>
     <a class="side-link {{ 'active' if page == 'Likes' else '' }}"
        href="{{ url_for('likes') }}">♡ Likes</a>
     <a class="side-link {{ 'active' if page == 'Matches' else '' }}"
        href="{{ url_for('matches') }}">♥ Matches</a>
     <a class="side-link {{ 'active' if page == 'Messages' else '' }}"
-       href="{{ url_for('messages') }}">☏ Messages</a>
+       href="{{ url_for('messages') }}"><span class="nav-icon">✉</span><span>Messages</span></a>
     <a class="side-link {{ 'active' if page == 'Profile' else '' }}"
-       href="{{ url_for('profile') }}">♙ Profile</a>
+       href="{{ url_for('profile') }}"><span class="nav-icon">♙</span><span>Profile</span></a>
     <a class="side-link {{ 'active' if page == 'Settings' else '' }}"
-       href="{{ url_for('settings') }}">⚙ Settings</a>
+       href="{{ url_for('settings') }}"><span class="nav-icon">⚙</span><span>Settings</span></a>
     <div class="panel">
       <strong class="pink">♥ Tonight's Hot Picks</strong>
       <p class="muted">Discover real people who have joined HotLink.</p>
@@ -57,35 +48,115 @@
     {% endwith %}
 
     {% if page == 'Profile' %}
-      <section class="panel">
-        <h1>Your Profile</h1>
-        <p class="muted">Your account information is saved in the database.</p>
-        <form method="post" enctype="multipart/form-data">
-          <label>Username</label>
-          <input value="{{ me.username }}" disabled>
-          <label>Email</label>
-          <input value="{{ me.email }}" disabled>
-          <label>Age</label>
-          <input value="{{ me.age }}" disabled>
-          <label>City or town</label>
-          <input name="city" maxlength="100" value="{{ me.city }}"
-                 placeholder="Enter your city or town">
-          <label>About me</label>
-          <textarea name="bio" maxlength="500"
-                    placeholder="Tell people about yourself">{{ me.bio }}</textarea>
-          <label>Choose a profile photo</label>
-          {% if me.photo %}
-            <div style="max-width:220px;margin:10px 0 16px">
-              <img src="{{ me.photo }}" alt="Your current profile photo"
-                   style="width:100%;border-radius:12px;border:1px solid #24303e">
-            </div>
+      <section class="fb-profile">
+        <div class="fb-cover"
+             {% if me.cover_photo %}
+             style="background-image:url('{{ me.cover_photo }}')"
+             {% endif %}>
+          {% if not me.cover_photo %}
+            <div class="fb-cover-placeholder">Your story starts here</div>
           {% endif %}
-          <input name="photo" type="file"
-                 accept="image/jpeg,image/png,image/webp"
-                 aria-label="Upload profile photo">
-          <p class="muted">JPG, PNG or WEBP. Maximum upload size: 2 MB.</p>
-          <button class="btn" type="submit">Save Profile</button>
-        </form>
+          <form method="post" enctype="multipart/form-data"
+                action="{{ url_for('upload_cover_photo') }}"
+                class="fb-cover-upload">
+            <label for="cover-photo-input">📷 Edit cover photo</label>
+            <input id="cover-photo-input" type="file" name="cover_photo"
+                   accept="image/jpeg,image/png,image/webp" required
+                   onchange="this.form.submit()">
+          </form>
+        </div>
+
+        <div class="fb-profile-heading">
+          <div class="fb-avatar-wrap">
+            {% if me.photo %}
+              <img class="fb-avatar" src="{{ me.photo }}" alt="Profile photo">
+            {% else %}
+              <div class="fb-avatar fb-avatar-empty">{{ me.username[0]|upper }}</div>
+            {% endif %}
+          </div>
+          <div class="fb-identity">
+            <h1>{{ me.username }}
+              {% if me.is_verified %}
+                <span class="verified-badge" title="Verified account"
+                      aria-label="Verified account"></span>
+              {% endif %}
+            </h1>
+            <p class="muted">{{ me.age }} years old{% if me.city %} · {{ me.city }}{% endif %}</p>
+            <p class="muted">Your HotLink profile</p>
+          </div>
+          <div class="fb-profile-menu-wrap">
+            <button type="button" class="fb-more-button"
+                    id="profile-more-button"
+                    aria-label="Profile options"
+                    aria-expanded="false"
+                    aria-controls="profile-more-menu">⋯</button>
+            <div class="fb-more-menu" id="profile-more-menu" hidden>
+              <button type="button" id="open-profile-editor">✎ Edit profile</button>
+            </div>
+          </div>
+        </div>
+
+        <nav class="fb-profile-tabs">
+          <a class="active" href="#profile-posts">Posts</a>
+          <a href="#profile-about">About</a>
+          <a href="#profile-photos">Photos</a>
+        </nav>
+
+        <div class="fb-profile-grid">
+          <section class="panel fb-edit-profile" id="profile-edit-panel" hidden>
+            <h2>Edit profile</h2>
+            <form method="post" enctype="multipart/form-data">
+              <label>Username</label>
+              <input value="{{ me.username }}" disabled>
+
+              <label>Email</label>
+              <input value="{{ me.email }}" disabled>
+
+              <label>Age</label>
+              <input value="{{ me.age }}" disabled>
+
+              <label>City or town</label>
+              <input name="city" maxlength="100"
+                     value="{{ me.city or '' }}" placeholder="Your city">
+
+              <label>About me</label>
+              <textarea name="bio" maxlength="500"
+                        placeholder="Tell people about yourself">{{ me.bio or '' }}</textarea>
+
+              <label>Profile picture</label>
+              {% if me.photo %}
+                <img class="fb-current-photo" src="{{ me.photo }}"
+                     alt="Current profile picture">
+              {% endif %}
+              <input name="photo" type="file"
+                     accept="image/jpeg,image/png,image/webp">
+              <p class="muted">JPG, PNG or WEBP.</p>
+              <button class="btn" type="submit">Save profile</button>
+            </form>
+          </section>
+
+          <section class="panel fb-about" id="profile-about">
+            <h2>About</h2>
+            <p>📍 {{ me.city or 'Location not added' }}</p>
+            <p>🎂 {{ me.age }} years old</p>
+            <p>✍️ {{ me.bio or 'Tell people a little about yourself.' }}</p>
+          </section>
+
+          <section class="panel fb-empty-posts" id="profile-posts">
+            <h2>Posts</h2>
+            <p class="muted">Your published posts appear in the Home feed.</p>
+            <a class="btn" href="{{ url_for('feed') }}">Go to feed</a>
+          </section>
+
+          <section class="panel fb-photos" id="profile-photos">
+            <h2>Photos</h2>
+            {% if me.photo %}
+              <img src="{{ me.photo }}" alt="Your profile photo">
+            {% else %}
+              <p class="muted">Upload a profile picture to get started.</p>
+            {% endif %}
+          </section>
+        </div>
       </section>
 
     {% elif page == 'Settings' %}
@@ -112,40 +183,86 @@
       </section>
 
     {% elif page == 'Chat' %}
-      <section class="panel">
-        <h1>Chat with {{ other.username }}</h1>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0">
+      <section class="messenger-shell">
+        <header class="messenger-header">
+          <a class="messenger-back" href="{{ url_for('messages') }}" aria-label="Back to messages">‹</a>
+          <div class="messenger-avatar">
+            {{ other.username[:1]|upper }}
+          </div>
+          <div class="messenger-person">
+            <h1>{{ other.username }}</h1>
+            <span class="muted">Private conversation</span>
+          </div>
+          <div class="messenger-actions">
+            <button class="messenger-action" type="button" disabled title="Voice calls coming next">☎</button>
+            <button class="messenger-action" type="button" disabled title="Video calls coming next">▣</button>
+          </div>
+        </header>
+
+        <div class="messenger-safety">
           <form method="post"
                 action="{{ url_for('block_user', user_id=other.id) }}"
                 onsubmit="return confirm('Block this user and remove the match?')">
-            <button class="btn btn-outline" type="submit">Block User</button>
+            <button class="btn btn-outline" type="submit">Block</button>
           </form>
+          <details>
+            <summary>Report</summary>
+            <form method="post" action="{{ url_for('report_user', user_id=other.id) }}">
+              <label for="report-reason">Reason for report</label>
+              <textarea id="report-reason" name="reason" minlength="5" maxlength="500"
+                        required placeholder="Explain your concern"></textarea>
+              <button class="btn btn-outline" type="submit">Submit Report</button>
+            </form>
+          </details>
         </div>
 
-        <form method="post"
-              action="{{ url_for('report_user', user_id=other.id) }}">
-          <label>Report this user</label>
-          <textarea name="reason" minlength="5" maxlength="500"
-                    required placeholder="Explain your concern"></textarea>
-          <button class="btn btn-outline" type="submit">Submit Report</button>
-        </form>
+        <div class="messenger-history" id="messengerHistory" aria-live="polite">
+          {% for m in history %}
+            <article class="message {{ 'mine' if m.sender_id == me.id else 'theirs' }}">
+              <div class="message-body">{{ m.body }}</div>
+              <time class="message-time">{{ m.created_at }}</time>
+            </article>
+          {% else %}
+            <div class="messenger-empty">
+              <div class="messenger-empty-icon">♡</div>
+              <h3>Say hello!</h3>
+              <p>Your conversation starts here.</p>
+            </div>
+          {% endfor %}
+        </div>
 
-
-        {% for m in history %}
-          <div class="message {{ 'mine' if m.sender_id == me.id else '' }}">
-            {{ m.body }}
-            <div class="muted">{{ m.created_at }}</div>
-          </div>
-        {% else %}
-          <div class="empty">No messages yet. Say hello!</div>
-        {% endfor %}
-        <form method="post">
-          <label>Your message</label>
-          <textarea name="body" maxlength="2000" required
-                    placeholder="Write a message..."></textarea>
-          <button class="btn" type="submit">Send Message →</button>
+        <form method="post" class="messenger-composer" id="messengerForm">
+          <label class="visually-hidden" for="messageBody">Your message</label>
+          <textarea id="messageBody" name="body" maxlength="2000" required
+                    rows="1" placeholder="Message {{ other.username }}..."></textarea>
+          <button class="messenger-send" type="submit" aria-label="Send message">➤</button>
         </form>
+        <p class="messenger-note">Be respectful. Never share passwords or financial details.</p>
       </section>
+
+      <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const history = document.getElementById("messengerHistory");
+        const form = document.getElementById("messengerForm");
+        const input = document.getElementById("messageBody");
+
+        if (history) history.scrollTop = history.scrollHeight;
+
+        if (input) {
+          const resize = () => {
+            input.style.height = "auto";
+            input.style.height = Math.min(input.scrollHeight, 120) + "px";
+          };
+          input.addEventListener("input", resize);
+          input.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+              event.preventDefault();
+              if (input.value.trim() && form) form.requestSubmit();
+            }
+          });
+        }
+      });
+      </script>
 
     {% elif page == 'Messages' %}
       <div class="section-head"><h1>Your Messages</h1></div>
@@ -162,6 +279,7 @@
       {% endfor %}
 
     {% else %}
+      {% if page != 'Feed' %}
       <section class="hero">
         <h1>
           {% if page == 'Matches' %}Your Matches
@@ -190,19 +308,233 @@
         </h2>
       </div>
 
+
+      {% endif %}
+
+      {% if page == 'Feed' %}
+        <section id="create-post" class="panel hotlink-feed-composer">
+  <a class="composer-open-link"
+     href="{{ url_for('create_post_page') }}"
+     style="display:block;text-decoration:none;color:inherit;">
+    <div class="composer-prompt">
+      What's on your mind?
+    </div>
+  </a>
+  <div class="composer-shortcut-row">
+    <a class="composer-media-button"
+       href="{{ url_for('create_post_page') }}">📷 Photo / Video</a>
+  </div>
+</section>
+
+        <section class="stories-panel">
+          <div class="stories-heading">
+            <h2>Stories</h2>
+            <span class="muted">Share a moment</span>
+          </div>
+          <div class="stories-row">
+            <a class="story-card create-story" href="{{ url_for('create_story') }}">
+              <span class="story-circle">＋</span>
+              <strong>Create Story</strong>
+            </a>
+            <div class="story-card story-placeholder">
+              <span class="story-circle">♡</span>
+              <strong>Your community</strong>
+            </div>
+            <div class="story-card story-placeholder">
+              <span class="story-circle">✦</span>
+              <strong>New moments</strong>
+            </div>
+          </div>
+        </section>
+
+
+
+        {% for post in posts %}
+          <article class="panel hotlink-post">
+            <div class="post-author">
+              <strong>
+                <a href="{{ url_for('public_profile', user_id=post['user_id']) }}">
+                  {{ post['username'] }}
+                </a>
+              </strong>
+              <small class="muted">{{ post['created_at'] }}</small>
+            </div>
+
+            {% if post['body'] %}
+              <p>{{ post['body'] }}</p>
+            {% endif %}
+
+            {% if post['media_path'] %}
+              {% if post['media_type'] == 'image' %}
+                <img class="post-media"
+                     src="{{ url_for('static', filename=post['media_path']) }}"
+                     alt="Post photo" loading="lazy">
+              {% elif post['media_type'] == 'video' %}
+                <video class="post-media" controls preload="metadata">
+                  <source src="{{ url_for('static', filename=post['media_path']) }}">
+                  Your browser does not support video playback.
+                </video>
+              {% endif %}
+            {% endif %}
+
+            <div class="post-stats">
+              👍 {{ post['like_count'] }} likes ·
+              {{ post['comment_count'] }} comments
+            </div>
+
+            <div class="post-actions">
+              <form method="post"
+                    action="{{ url_for('like_post', post_id=post['id']) }}"
+                    class="reaction-like-form">
+                <button type="submit"
+                        class="post-action-button {{ 'is-liked' if post['liked_by_me'] else '' }}"
+                        aria-label="Like post"
+                        oncontextmenu="return false">
+                  <span class="action-icon">{{ '👍' if post['liked_by_me'] else '♡' }}</span>
+                  <span>Like</span>
+                </button>
+              </form>
+
+              <button type="button"
+                      class="post-action-button comment-toggle"
+                      aria-expanded="false"
+                      data-comments="comments-{{ post['id'] }}"
+                      data-preview="preview-{{ post['id'] }}"
+                      oncontextmenu="return false">
+                <span class="action-icon">💬</span>
+                <span>Comment</span>
+              </button>
+            </div>
+
+            <div class="comment-preview"
+                 id="preview-{{ post['id'] }}"
+                 hidden>
+              {% set latest_comments = post_comments.get(post['id'], []) %}
+              {% if latest_comments %}
+                {% set newest = latest_comments[-1] %}
+                <strong>{{ newest['username'] }}</strong>
+                <span>{{ newest['body'] }}</span>
+              {% else %}
+                <span>No comments yet.</span>
+              {% endif %}
+            </div>
+
+            <section class="post-comments"
+                     id="comments-{{ post['id'] }}"
+                     hidden>
+              <h4>Comments</h4>
+
+              {% for comment in post_comments.get(post['id'], []) %}
+                <div class="post-comment">
+                  <strong>{{ comment['username'] }}</strong>
+                  <p>{{ comment['body'] }}</p>
+                  <small class="muted">{{ comment['created_at'] }}</small>
+                </div>
+              {% else %}
+                <p class="muted">No comments yet. Start the conversation!</p>
+              {% endfor %}
+
+              <form method="post"
+                    action="{{ url_for('add_post_comment', post_id=post['id']) }}"
+                    class="comment-form">
+                <input type="text" name="body"
+                       placeholder="Write a comment..."
+                       maxlength="2000" required>
+                <button type="submit" class="btn btn-small">Comment</button>
+              </form>
+            </section>
+          </article>
+        {% else %}
+          <section class="panel">
+            <h3>No posts yet</h3>
+            <p class="muted">Be the first to share something with the HotLink community.</p>
+          </section>
+        {% endfor %}
+      {% endif %}
+
+      {% if page == 'PublicProfile' %}
+      <section class="cards">
+        <article class="card public-profile">
+          <div class="avatar">
+            {% if other.photo %}
+              <img src="{{ other.photo }}" alt="Profile photo">
+            {% else %}
+              {{ other.username[0]|upper }}
+            {% endif %}
+          </div>
+
+          <div class="card-body">
+            <h2>{{ other.username }}</h2>
+            <p class="muted">{{ other.age }} years old</p>
+            <p class="muted">{{ other.city or 'Location not provided' }}</p>
+            <p>{{ other.bio or 'This member has not added a bio yet.' }}</p>
+
+            <div class="actions">
+              {% if mutual %}
+                <a class="btn btn-small"
+                   href="{{ url_for('chat', user_id=other.id) }}">Message</a>
+              {% else %}
+                <span class="muted">Like each other to unlock messaging.</span>
+              {% endif %}
+
+              {% if already_liked %}
+                <span class="btn btn-small btn-outline">♥ Liked</span>
+              {% else %}
+                <form method="post"
+                      action="{{ url_for('like', user_id=other.id) }}">
+                  <button class="btn btn-small" type="submit">♡ Like</button>
+                </form>
+              {% endif %}
+
+              <form method="post"
+                    action="{{ url_for('follow_user', user_id=other.id) }}">
+                <button class="btn btn-small" type="submit">
+                  {{ 'Following' if following else '＋ Follow' }}
+                </button>
+              </form>
+
+              {% if friend_request %}
+                {% if friend_request.sender_id == other.id and friend_request.status == 'pending' %}
+                  <form method="post"
+                        action="{{ url_for('respond_friend_request', request_id=friend_request.id) }}">
+                    <button class="btn btn-small" name="action" value="accept"
+                            type="submit">Accept Friend Request</button>
+                  </form>
+                {% elif friend_request.status == 'accepted' %}
+                  <span class="muted">✓ Friends</span>
+                {% elif friend_request.status == 'pending' %}
+                  <span class="muted">Friend request sent</span>
+                {% endif %}
+              {% else %}
+                <form method="post"
+                      action="{{ url_for('send_friend_request', user_id=other.id) }}">
+                  <button class="btn btn-small" type="submit">＋ Add Friend</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+      </section>
+      {% else %}
       <section class="cards">
         {% for u in users %}
           <article class="card">
-            <div class="avatar">
+            <a class="avatar"
+               href="{{ url_for('public_profile', user_id=u.id) }}"
+               aria-label="View {{ u.username }}'s profile">
               {% if u.photo %}
                 <img src="{{ u.photo }}" alt="Profile photo"
                      loading="lazy" referrerpolicy="no-referrer">
               {% else %}
                 {{ u.username[0]|upper }}
               {% endif %}
-            </div>
+            </a>
             <div class="card-body">
-              <h3>{{ u.username }}</h3>
+              <h3>
+                <a href="{{ url_for('public_profile', user_id=u.id) }}">
+                  {{ u.username }}
+                </a>
+              </h3>
               <div class="muted">{{ u.age }} years old</div>
               <div class="muted">{{ u.city or 'Location not provided' }}</div>
               <p>{{ u.bio or 'This member has not added a bio yet.' }}</p>
@@ -238,6 +570,7 @@
           </div>
         {% endfor %}
       </section>
+      {% endif %}
     {% endif %}
   </main>
 </div>
@@ -246,5 +579,201 @@
   ♥ HotLink · Real People. Real Connections. · Adults 18+ ·
   <a href="{{ url_for('settings') }}">Privacy</a>
 </footer>
+
+<!-- HotLink floating LIVE button -->
+
+
+<style>
+#hotlink-floating-live {
+  position: fixed;
+  right: 18px;
+  bottom: 92px;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 17px;
+  color: #fff;
+  text-decoration: none;
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, #ff2877, #ff1744);
+  border: 2px solid rgba(255,255,255,.9);
+  border-radius: 40px;
+  box-shadow: 0 5px 22px rgba(255, 35, 105, .55);
+  animation: hlLiveFloat 2s ease-in-out infinite,
+             hlLiveGlow 1.8s ease-in-out infinite;
+}
+#hotlink-floating-live .hl-live-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  background: white;
+  color: #ff2877;
+  border-radius: 50%;
+  font-size: 11px;
+}
+@keyframes hlLiveFloat {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes hlLiveGlow {
+  0%,100% { box-shadow: 0 5px 15px rgba(255,35,105,.35); }
+  50% { box-shadow: 0 5px 28px rgba(255,35,105,.8); }
+}
+#hotlink-floating-live:active {
+  transform: scale(.94);
+}
+@media (prefers-reduced-motion: reduce) {
+  #hotlink-floating-live { animation: none; }
+}
+</style>
+
+<a id="hotlink-floating-live" href="/live" aria-label="Open HotLink Live">
+  <span class="hl-live-icon">▶</span>
+  <span class="hl-live-label">LIVE</span>
+</a>
 </body>
 </html>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".comment-toggle").forEach(function (button) {
+    const comments = document.getElementById(button.dataset.comments);
+    const preview = document.getElementById(button.dataset.preview);
+    let holdTimer;
+    let longPressed = false;
+
+    button.addEventListener("pointerdown", function () {
+      longPressed = false;
+      holdTimer = setTimeout(function () {
+        longPressed = true;
+        preview.hidden = !preview.hidden;
+        comments.hidden = true;
+        button.setAttribute("aria-expanded", "false");
+      }, 550);
+    });
+
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (eventName) {
+      button.addEventListener(eventName, function () {
+        clearTimeout(holdTimer);
+      });
+    });
+
+    button.addEventListener("click", function () {
+      if (longPressed) {
+        longPressed = false;
+        return;
+      }
+      comments.hidden = !comments.hidden;
+      preview.hidden = true;
+      button.setAttribute("aria-expanded", String(!comments.hidden));
+    });
+  });
+
+  document.querySelectorAll(".reaction-like-form").forEach(function (form) {
+    const button = form.querySelector("button");
+    let holdTimer;
+    let longPressed = false;
+    let picker;
+
+    function closePicker() {
+      if (picker) picker.remove();
+      picker = null;
+    }
+
+    function showPicker() {
+      closePicker();
+      picker = document.createElement("div");
+      picker.className = "reaction-picker";
+
+      [
+        ["like", "👍"],
+        ["love", "❤️"],
+        ["haha", "😂"],
+        ["wow", "😮"],
+        ["sad", "😢"],
+        ["angry", "😡"]
+      ].forEach(function (item) {
+        const reaction = document.createElement("button");
+        reaction.type = "button";
+        reaction.textContent = item[1];
+        reaction.setAttribute("aria-label", item[0]);
+        reaction.addEventListener("click", function () {
+          let field = form.querySelector('input[name="reaction"]');
+          if (!field) {
+            field = document.createElement("input");
+            field.type = "hidden";
+            field.name = "reaction";
+            form.appendChild(field);
+          }
+          field.value = item[0];
+          form.requestSubmit();
+          closePicker();
+        });
+        picker.appendChild(reaction);
+      });
+
+      form.appendChild(picker);
+    }
+
+    button.addEventListener("pointerdown", function () {
+      longPressed = false;
+      holdTimer = setTimeout(function () {
+        longPressed = true;
+        showPicker();
+      }, 550);
+    });
+
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (eventName) {
+      button.addEventListener(eventName, function () {
+        clearTimeout(holdTimer);
+      });
+    });
+
+    button.addEventListener("click", function (event) {
+      if (longPressed) {
+        event.preventDefault();
+        longPressed = false;
+      }
+    });
+  });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const more = document.getElementById("profile-more-button");
+  const menu = document.getElementById("profile-more-menu");
+  const editButton = document.getElementById("open-profile-editor");
+  const editor = document.getElementById("profile-edit-panel");
+
+  if (!more || !menu || !editButton || !editor) return;
+
+  more.addEventListener("click", function () {
+    menu.hidden = !menu.hidden;
+    more.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+
+  editButton.addEventListener("click", function () {
+    editor.hidden = !editor.hidden;
+    menu.hidden = true;
+    more.setAttribute("aria-expanded", "false");
+    if (!editor.hidden) {
+      editor.scrollIntoView({behavior: "smooth", block: "start"});
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    if (!event.target.closest(".fb-profile-menu-wrap")) {
+      menu.hidden = true;
+      more.setAttribute("aria-expanded", "false");
+    }
+  });
+});
+</script>
+
