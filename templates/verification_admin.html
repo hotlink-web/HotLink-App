@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel" style="padding:18px">
+  <h2>Member verification</h2>
+  <p class="muted">Choose which members display the blue verified badge.</p>
+  {% for member in members %}
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <strong>{{ member['username'] }}</strong>
+        {% if member['is_verified'] %}
+          <span class="verified-badge" aria-label="Verified"></span>
+        {% endif %}
+      </div>
+      <form method="post" style="margin:0">
+        <input type="hidden" name="user_id" value="{{ member['id'] }}">
+        {% if member['is_verified'] %}
+          <button class="btn btn-small" name="action" value="unverify">Remove badge</button>
+        {% else %}
+          <button class="btn btn-small" name="action" value="verify">Verify</button>
+        {% endif %}
+      </form>
+    </div>
+  {% else %}
+    <p>No members found.</p>
+  {% endfor %}
+</section>
+{% endblock %}
