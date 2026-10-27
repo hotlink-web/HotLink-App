@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Story | HotLink</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .story-page { width:min(600px,94%); margin:28px auto; }
+    .story-card-form {
+      background:var(--panel); border:1px solid var(--border);
+      border-radius:16px; padding:20px;
+    }
+    .story-card-form textarea {
+      box-sizing:border-box; width:100%; min-height:100px;
+      padding:13px; background:var(--panel2); color:var(--text);
+      border:1px solid var(--border); border-radius:10px; font:inherit;
+    }
+    .story-card-form input[type=file] { display:block; max-width:100%; margin:14px 0; }
+    .story-actions { display:flex; gap:12px; align-items:center; margin-top:18px; }
+  </style>
+</head>
+<body>
+  <main class="story-page">
+    <p><a href="{{ url_for('home') }}">← Back to Home</a></p>
+    <section class="story-card-form">
+      <h1>Create Story</h1>
+      <p class="muted">Share a photo or video with your community. Stories expire after 24 hours.</p>
+      <form method="post" action="{{ url_for('create_story') }}" enctype="multipart/form-data">
+        <label for="story-caption">Caption (optional)</label>
+        <textarea id="story-caption" name="caption" maxlength="500"
+                  placeholder="Add a caption..."></textarea>
+        <label for="story-media">Choose a photo or video</label>
+        <input id="story-media" type="file" name="media"
+               accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime"
+               required>
+        <div class="story-actions">
+          <button class="btn" type="submit">Publish Story</button>
+          <a href="{{ url_for('home') }}">Cancel</a>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

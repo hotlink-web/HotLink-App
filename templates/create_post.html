@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Post | HotLink</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .create-post-page {
+      width: min(650px, 94%);
+      margin: 30px auto;
+    }
+    .create-post-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .create-post-header a {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 24px;
+    }
+    .create-post-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+    }
+    .create-post-card textarea {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      padding: 16px;
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font: inherit;
+    }
+    .create-post-options {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .create-post-options label {
+      cursor: pointer;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .create-post-options input[type="file"] {
+      max-width: 100%;
+      margin-top: 10px;
+    }
+    .create-post-submit {
+      width: 100%;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+<body>
+  <main class="create-post-page">
+    <div class="create-post-header">
+      <a href="{{ url_for('home') }}" aria-label="Back to Home">←</a>
+      <h1>Create Post</h1>
+    </div>
+
+    <section class="create-post-card">
+      <form method="post" action="{{ url_for('create_post') }}"
+            enctype="multipart/form-data">
+        <textarea name="body"
+                  placeholder="What's on your mind?"
+                  autofocus></textarea>
+
+        <div class="create-post-options">
+          <label for="post-media">📷 Photo or video</label>
+          <input id="post-media" type="file" name="media"
+                 accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime">
+        </div>
+
+        <p id="media-name" class="muted"></p>
+        <button class="btn create-post-submit" type="submit">Post</button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const mediaInput = document.getElementById("post-media");
+    const mediaName = document.getElementById("media-name");
+    mediaInput.addEventListener("change", function () {
+      mediaName.textContent = mediaInput.files.length
+        ? "Selected: " + mediaInput.files[0].name
+        : "";
+    });
+  </script>
+</body>
+</html>
